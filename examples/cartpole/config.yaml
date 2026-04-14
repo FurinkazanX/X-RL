@@ -1,0 +1,69 @@
+# 全局配置
+global:
+  algorithm: PPO  # 强化学习算法
+
+# Summary 配置
+summary:
+  enabled: True  # 是否启用 Summary
+  type: TensorBoardSummary  # Summary 类型，可选 TensorBoardSummary 或 WandBSummary
+  log_dir: ./logs  # TensorBoard 日志目录
+
+# Ray 配置
+ray:
+  address: null  # Ray 集群地址，null 表示启动本地集群
+  num_cpus: 4  # CPU 数量（减少以避免资源问题）
+  num_gpus: 1  # GPU 数量（默认 0，有 GPU 时可改为 1）
+
+# Actor 配置
+actor:
+  count: 10 # Actor 数量
+  nodes:  # Actor 运行节点
+    - localhost
+
+# Learner 配置
+learner:
+  type: Learner  # Learner 类型
+  batch_size: 2048  # 批量大小 - 增大以便更好地训练
+  epochs: 4  # 训练轮数
+  nodes:  # Learner 运行节点
+    - localhost
+
+# Replay Buffer 配置
+replay_buffer:
+  type: UniformReplayBuffer  # Replay Buffer 类型
+  size: 1000000  # 缓冲区大小
+  batch_size: 256  # 批量大小
+  nodes:  # Replay Buffer 运行节点
+    - localhost
+
+# 环境配置
+env:
+  module: examples.cartpole.cartpole_env  # 环境模块路径
+  class: CartPoleEnv  # 环境类名称
+  params:  # 环境参数
+    render_mode: null
+
+# 模型配置
+models:
+  main:
+    module: examples.cartpole.cartpole_model  # 模型模块路径
+    class: CartPoleModel  # 模型类名称
+    params:  # 模型参数
+      input_dim: 4
+      action_dim: 2
+      hidden_dims: [64, 64]
+
+# 智能体配置
+agents:
+  agent:
+    module: examples.cartpole.cartpole_agent  # 智能体模块路径
+    class: CartPoleAgent  # 智能体类名称
+    models:  # 智能体使用的模型
+      - main
+    predictors:  # 智能体使用的 Predictor
+      - main
+
+# Controller 配置
+controller:
+  type: SyncController  # Controller 类型
+  sync_step_interval: 5  # 模型参数同步间隔，每 N 个 train step 同步一次
