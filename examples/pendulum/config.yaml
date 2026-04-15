@@ -52,6 +52,7 @@ models:
       input_dim: 3
       action_dim: 1
       hidden_dims: [256, 256]
+      lr: 0.0005
 
 # 智能体配置
 agents:
