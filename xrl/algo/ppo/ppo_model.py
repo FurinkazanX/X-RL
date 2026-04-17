@@ -175,8 +175,8 @@ class PPOModel(Model):
         """从 experiences 中提取并准备数据"""
         states = [exp.state for exp in experiences]
         actions = self._extract_actions(experiences)
-        advantages = [exp.info['advantage'] for exp in experiences]
-        returns = [exp.info['return'] for exp in experiences]
+        advantages = [exp.advantage for exp in experiences]
+        returns = [exp.return_ for exp in experiences]
         
         states = torch.FloatTensor(np.array(states))
         
@@ -312,9 +312,8 @@ class PPOModel(Model):
         
         processed_experiences = []
         for i, exp in enumerate(trajectory.experiences):
-            exp.info["advantage"] = advantages[i]
-            exp.info["return"] = returns[i]
             exp.advantage = advantages[i]
+            exp.return_ = returns[i]
             processed_experiences.append(exp)
         
         return processed_experiences

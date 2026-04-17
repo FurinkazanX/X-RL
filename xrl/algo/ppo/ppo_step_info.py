@@ -30,3 +30,6 @@ class PPOStepInfo(StepInfo):
         
         if "dist_params" in model_output and "log_prob" in model_output:
             self.log_prob = model_output["log_prob"]
+
+        self.advantage = None
+        self.return_ = None
