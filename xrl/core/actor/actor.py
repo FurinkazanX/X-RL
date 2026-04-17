@@ -114,35 +114,16 @@ class Actor(BaseActor):
     
     def update_all_model_parameters(self, model_params: Dict[str, Dict[str, Any]]) -> None:
         """更新所有模型的参数
-        
+
         Args:
             model_params: 模型参数字典 {model_name: parameters}
         """
         print(f"Actor: 收到参数同步请求，准备更新 {len(model_params)} 个模型")
-        
-        # 更新 Actor 中的模型
+
         for model_name, params in model_params.items():
             if model_name in self.models and hasattr(self.models[model_name], 'set_parameters'):
                 self.models[model_name].set_parameters(params)
                 print(f"Actor: 模型 {model_name} 参数已更新")
-        
-        # 更新 Agent 中的模型
-        for agent in self.agents.values():
-            # 先更新 agent.models 中的参数
-            if hasattr(agent, 'models'):
-                for model_name, params in model_params.items():
-                    if model_name in agent.models and hasattr(agent.models[model_name], 'set_parameters'):
-                        agent.models[model_name].set_parameters(params)
-            
-            # 关键！如果 agent 有 self.model 这样的属性，也要更新！
-            if hasattr(agent, 'model'):
-                # 找到对应的 model_name 更新 agent.model
-                for model_name, params in model_params.items():
-                    if hasattr(agent, 'model_name') and agent.model_name == model_name:
-                        if hasattr(agent.model, 'set_parameters'):
-                            agent.model.set_parameters(params)
-                            print(f"Actor: Agent 的 self.model 参数已更新 ({model_name})")
-                        break
     
     def reset(self) -> None:
         """重置 Actor 状态"""
