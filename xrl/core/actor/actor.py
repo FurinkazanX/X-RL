@@ -119,11 +119,9 @@ class Actor(BaseActor):
             model_params: 模型参数字典 {model_name: parameters}
         """
         print(f"Actor: 收到参数同步请求，准备更新 {len(model_params)} 个模型")
-
         for model_name, params in model_params.items():
-            if model_name in self.models and hasattr(self.models[model_name], 'set_parameters'):
-                self.models[model_name].set_parameters(params)
-                print(f"Actor: 模型 {model_name} 参数已更新")
+            self.update_model_parameters(model_name, params)
+            print(f"Actor: 模型 {model_name} 参数已更新")
     
     def reset(self) -> None:
         """重置 Actor 状态"""

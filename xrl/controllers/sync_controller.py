@@ -239,6 +239,10 @@ class SyncController(BaseController):
 
         print(f"SyncController: Learner 初始化成功（节点: {learner_node}）")
 
+        # 读取训练批次大小，供 start() 中采样使用
+        self.batch_size = learner_config.get("batch_size", 512)
+        print(f"SyncController: 训练批次大小: {self.batch_size}")
+
         print(f"SyncController: 所有组件初始化完成！")
     
     def start(self):
@@ -282,28 +286,23 @@ class SyncController(BaseController):
                 buffer_size = ray.get(self.components["replay_buffer"].get_size.remote())
                 print(f"SyncController: Replay Buffer 大小: {buffer_size}")
 
-                # 调用 Learner 执行训练（Learner 内部负责采样和最小数据量检查）
-                print(f"SyncController: 开始训练...")
-                success = ray.get(self.components["learner"].train_step.remote())
+                if buffer_size >= self.batch_size:
+                    # Controller 负责从 replay buffer 采样，再传给 Learner 训练
+                    experiences = ray.get(self.components["replay_buffer"].sample.remote(self.batch_size))
+                    print(f"SyncController: 开始训练...")
+                    success = ray.get(self.components["learner"].learn.remote(experiences))
 
-                if success:
-                    self.train_count += 1
-                    print(f"SyncController: 训练完成！总训练步数: {self.train_count}")
+                    if success:
+                        self.train_count += 1
+                        print(f"SyncController: 训练完成！总训练步数: {self.train_count}")
 
-                    # 从 Learner 获取最新参数并同步给所有 Actors
-                    model_params = ray.get(self.components["learner"].get_all_model_parameters.remote())
+                        # 从 Learner 获取最新参数并同步给所有 Actors
+                        model_params = ray.get(self.components["learner"].get_all_model_parameters.remote())
 
-                    print(f"SyncController: 同步模型参数给所有 Actors...")
-                    for actor in self.components["actors"]:
-                        actor.update_all_model_parameters.remote(model_params)
-                    print(f"SyncController: 所有 Actors 的模型参数已同步")
-
-                    # 同步参数给所有 Predictors
-                    for predictor_name, predictor_actor in self.components.get("predictors", {}).items():
-                        if predictor_name in model_params:
-                            predictor_actor.update_parameters.remote(predictor_name, model_params[predictor_name])
-                    if self.components.get("predictors"):
-                        print(f"SyncController: 所有 Predictors 的模型参数已同步")
+                        print(f"SyncController: 同步模型参数给所有 Actors...")
+                        for actor in self.components["actors"]:
+                            actor.update_all_model_parameters.remote(model_params)
+                        print(f"SyncController: 所有 Actors 的模型参数已同步")
                 
                 print(f"\n{'=' * 60}\n")
                 

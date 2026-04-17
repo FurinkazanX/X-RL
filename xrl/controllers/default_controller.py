@@ -302,17 +302,11 @@ class DefaultController(BaseController):
             print(f"Controller: 从 Learner 获取到 {len(model_params)} 个模型的参数")
             
             if model_params:
-                # 更新所有 Actors 的模型参数
+                # 更新所有 Actors 的模型参数（Actor 内部会同步传播到 Predictor）
                 for i, actor in enumerate(self.components["actors"]):
                     actor.update_all_model_parameters.remote(model_params)
                     print(f"Controller: 已发送参数更新请求给 Actor {i+1}")
                 print(f"Controller: 模型参数已同步，更新了 {len(self.components['actors'])} 个 Actors")
-
-                # 更新所有 Predictors 的模型参数
-                for predictor_name, predictor_actor in self.components.get("predictors", {}).items():
-                    if predictor_name in model_params:
-                        predictor_actor.update_parameters.remote(predictor_name, model_params[predictor_name])
-                        print(f"Controller: 已发送参数更新请求给 Predictor '{predictor_name}'")
             
             print("=" * 60)
         

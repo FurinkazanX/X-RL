@@ -51,7 +51,7 @@ class BaseActor:
         raise NotImplementedError
     
     def update_model_parameters(self, model_name: str, parameters: Dict[str, Any]) -> None:
-        """更新模型参数
+        """更新模型参数，并同步到 Agent 持有的 Predictor
 
         Args:
             model_name: 模型名称
@@ -59,3 +59,9 @@ class BaseActor:
         """
         if model_name in self.models:
             self.models[model_name].set_parameters(parameters)
+
+        # Agent 持有 Predictor 的 Ray Actor 句柄，顺带推送参数更新，
+        # Controller 无需单独感知 Predictor 的存在
+        for agent in self.agents.values():
+            if model_name in agent.predictors:
+                agent.predictors[model_name].update_parameters.remote(model_name, parameters)

@@ -21,9 +21,37 @@ class Learner(BaseLearner):
         self.train_step_count = 0  # 训练步数计数
         self.running = False  # 控制训练循环的标志
     
+    def learn(self, experiences) -> bool:
+        """在给定的经验数据上训练（Controller 负责数据流时使用）
+
+        Controller 自行完成 replay buffer 的写入和采样，将数据直接传入此方法，
+        Learner 只负责模型更新，不感知 replay buffer。
+
+        Args:
+            experiences: 经验数据列表
+
+        Returns:
+            是否成功执行训练
+        """
+        if not experiences or len(experiences) < 10:
+            return False
+
+        print(f"Learner: 收到 {len(experiences)} 条经验，开始训练")
+
+        for model_name, model in self.models.items():
+            model.learn(experiences)
+
+        print(f"Learner: 训练完成！当前训练步数: {self.train_step_count + 1}")
+
+        self.train_step_count += 1
+        return True
+
     def train_step(self) -> bool:
-        """执行单次训练步骤
-        
+        """执行单次训练步骤（异步模式使用，含 buffer 守卫）
+
+        供 DefaultController 的异步训练循环调用，Learner 自主从 replay buffer
+        采样并训练。若数据不足则返回 False，由调用方稍后重试。
+
         Returns:
             是否成功执行训练
         """
