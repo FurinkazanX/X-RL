@@ -1,5 +1,6 @@
 """Pendulum 智能体实现"""
 
+import ray
 import numpy as np
 from xrl.interfaces.agent import Agent
 from typing import Dict, Any
@@ -36,7 +37,7 @@ class PendulumAgent(Agent):
         # 使用预测器或直接使用模型进行预测
         if self.predictor:
             # 使用远程预测器
-            result = self.predictor.predict.remote(self.model_name, {"state": obs, "model_name": self.model_name})
+            result = ray.get(self.predictor.predict.remote(self.model_name, {"state": obs, "model_name": self.model_name}))
             actions = result["actions"]
             action = actions["action"]  # 从 actions 字典中提取单个动作
             # 从结果中提取 StepInfo 对象

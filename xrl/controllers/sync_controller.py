@@ -77,8 +77,40 @@ class SyncController(BaseController):
             )
             self.models[model_name] = model_cls(**model_config.get("params", {}))
         
-        # 初始化 Agents
+        # 初始化 Predictors（根据 agents 配置中引用的 predictor 名称）
+        predictor_config = self.config.get("predictor", {})
+        predictor_cls = getattr(
+            importlib.import_module("xrl.core.predictor"),
+            predictor_config.get("type", "LocalPredictor")
+        )
+        predictor_nodes = predictor_config.get("nodes", ["localhost"])
+        predictor_node = predictor_nodes[0] if predictor_nodes else "localhost"
+
         agents_config = self.config.get("agents", {})
+
+        # 收集所有 agent 需要的 predictor 名称
+        all_predictor_names = set()
+        for agent_config in agents_config.values():
+            for name in agent_config.get("predictors", []):
+                all_predictor_names.add(name)
+
+        # 为每个 predictor 名称创建一个 Predictor Ray Actor
+        self.components["predictors"] = {}
+        for predictor_name in all_predictor_names:
+            if predictor_name not in self.models:
+                print(f"SyncController: 警告 - predictor '{predictor_name}' 对应的模型不存在，跳过")
+                continue
+            predictor_options = {}
+            if predictor_node != "localhost":
+                predictor_options["resources"] = {f"node:{predictor_node}": 0.01}
+            if predictor_options:
+                actor = predictor_cls.options(**predictor_options).remote({predictor_name: self.models[predictor_name]})
+            else:
+                actor = predictor_cls.remote({predictor_name: self.models[predictor_name]})
+            self.components["predictors"][predictor_name] = actor
+            print(f"SyncController: Predictor '{predictor_name}' 初始化成功（节点: {predictor_node}）")
+
+        # 初始化 Agents
         self.agents = {}
         for agent_name, agent_config in agents_config.items():
             agent_cls = getattr(
@@ -87,7 +119,11 @@ class SyncController(BaseController):
             )
             model_names = agent_config.get("models", list(self.models.keys()))
             agent_models = {name: self.models[name] for name in model_names if name in self.models}
-            self.agents[agent_name] = agent_cls(agent_models, {})
+            predictor_names = agent_config.get("predictors", [])
+            agent_predictors = {name: self.components["predictors"][name]
+                                for name in predictor_names
+                                if name in self.components["predictors"]}
+            self.agents[agent_name] = agent_cls(agent_models, agent_predictors)
         
         # 初始化环境
         env_config = self.config.get("env", {})
@@ -237,8 +273,16 @@ class SyncController(BaseController):
                         
                         for actor in self.components["actors"]:
                             actor.update_all_model_parameters.remote(model_params)
-                        
+
                         print(f"SyncController: 所有 Actors 的模型参数已同步")
+
+                        # 同步参数给所有 Predictors
+                        for predictor_name, predictor_actor in self.components.get("predictors", {}).items():
+                            if predictor_name in model_params:
+                                predictor_actor.update_parameters.remote(predictor_name, model_params[predictor_name])
+
+                        if self.components.get("predictors"):
+                            print(f"SyncController: 所有 Predictors 的模型参数已同步")
                 
                 print(f"\n{'=' * 60}\n")
                 
