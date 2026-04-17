@@ -73,14 +73,13 @@ class AsyncController(BaseController):
             agent_models = {name: self.models[name] for name in model_names if name in self.models}
             self.agents[agent_name] = agent_cls(agent_models, {})
         
-        # 初始化环境
+        # 初始化环境（保存配置供每个 Actor 独立创建实例）
         env_config = self.config.get("env", {})
         env_cls = getattr(
             importlib.import_module(env_config["module"]),
             env_config["class"]
         )
-        self.env = env_cls(**env_config.get("params", {}))
-        
+
         # 初始化 Replay Buffer
         replay_buffer_config = self.config.get("replay_buffer", {})
         replay_buffer_cls = getattr(
@@ -91,7 +90,7 @@ class AsyncController(BaseController):
             replay_buffer_config.get("size", 1000000)
         )
         print(f"AsyncController: Replay Buffer 初始化成功，大小: {replay_buffer_config.get('size', 1000000)}")
-        
+
         # 初始化 Actors（支持多个）
         actor_config = self.config.get("actor", {})
         actor_count = actor_config.get("count", 1)
@@ -99,14 +98,20 @@ class AsyncController(BaseController):
             importlib.import_module("xrl.core.actor"),
             actor_config.get("type", "Actor")
         )
-        
+        actor_gamma = actor_config.get("gamma", 0.99)
+        actor_lam = actor_config.get("lam", 0.95)
+
         self.components["actors"] = []
         for i in range(actor_count):
+            # 每个 Actor 创建独立的环境实例
+            env = env_cls(**env_config.get("params", {}))
             actor = actor_cls.remote(
-                self.env,
+                env,
                 self.agents,
                 self.components["replay_buffer"],
-                self.models
+                self.models,
+                actor_gamma,
+                actor_lam
             )
             self.components["actors"].append(actor)
             print(f"AsyncController: Actor {i+1} 初始化成功")
