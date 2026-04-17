@@ -266,7 +266,6 @@ class DefaultController(BaseController):
                     try:
                         # 现在 Learner 是 async 的，查询不会被阻塞了
                         current_step = ray.get(self.components["learner"].get_train_step_count.remote(), timeout=2.0)
-                        print("aaaa", current_step, last_synced_step, sync_step_interval)
                         if current_step - last_synced_step >= sync_step_interval and current_step > 0:
                             print(f"Controller: 当前训练步数 {current_step}，开始同步模型参数...")
                             self._sync_model_parameters()
