@@ -64,8 +64,40 @@ class DefaultController(BaseController):
             )
             self.models[model_name] = model_cls(**model_config.get("params", {}))
         
-        # 初始化 Agents
+        # 初始化 Predictors（根据 agents 配置中引用的 predictor 名称）
+        predictor_config = self.config.get("predictor", {})
+        predictor_cls = getattr(
+            importlib.import_module("xrl.core.predictor"),
+            predictor_config.get("type", "LocalPredictor")
+        )
+        predictor_nodes = predictor_config.get("nodes", ["localhost"])
+        predictor_node = predictor_nodes[0] if predictor_nodes else "localhost"
+
         agents_config = self.config.get("agents", {})
+
+        # 收集所有 agent 需要的 predictor 名称
+        all_predictor_names = set()
+        for agent_config in agents_config.values():
+            for name in agent_config.get("predictors", []):
+                all_predictor_names.add(name)
+
+        # 为每个 predictor 名称创建一个 Predictor Ray Actor
+        self.components["predictors"] = {}
+        for predictor_name in all_predictor_names:
+            if predictor_name not in self.models:
+                print(f"Controller: 警告 - predictor '{predictor_name}' 对应的模型不存在，跳过")
+                continue
+            predictor_options = {}
+            if predictor_node != "localhost":
+                predictor_options["resources"] = {f"node:{predictor_node}": 0.01}
+            if predictor_options:
+                actor = predictor_cls.options(**predictor_options).remote({predictor_name: self.models[predictor_name]})
+            else:
+                actor = predictor_cls.remote({predictor_name: self.models[predictor_name]})
+            self.components["predictors"][predictor_name] = actor
+            print(f"Controller: Predictor '{predictor_name}' 初始化成功（节点: {predictor_node}）")
+
+        # 初始化 Agents（传入对应的 predictors）
         self.agents = {}
         for agent_name, agent_config in agents_config.items():
             agent_cls = getattr(
@@ -74,7 +106,11 @@ class DefaultController(BaseController):
             )
             model_names = agent_config.get("models", list(self.models.keys()))
             agent_models = {name: self.models[name] for name in model_names if name in self.models}
-            self.agents[agent_name] = agent_cls(agent_models, {})
+            predictor_names = agent_config.get("predictors", [])
+            agent_predictors = {name: self.components["predictors"][name]
+                                for name in predictor_names
+                                if name in self.components["predictors"]}
+            self.agents[agent_name] = agent_cls(agent_models, agent_predictors)
         
         # 初始化环境
         env_config = self.config.get("env", {})
@@ -184,31 +220,6 @@ class DefaultController(BaseController):
         
         print(f"Controller: Learner 初始化成功（节点: {learner_node}）")
         
-        # 初始化 Predictor（如果启用，支持节点分配）
-        predictor_config = self.config.get("predictor", {})
-        if predictor_config.get("enabled", False):
-            predictor_cls = getattr(
-                importlib.import_module("xrl.core.predictor"),
-                predictor_config.get("type", "LocalPredictor")
-            )
-            
-            # 获取 Predictor 节点
-            predictor_nodes = predictor_config.get("nodes", ["localhost"])
-            predictor_node = predictor_nodes[0] if predictor_nodes else "localhost"
-            
-            # 准备 Predictor options
-            predictor_options = {}
-            if predictor_node != "localhost":
-                predictor_options["resources"] = {f"node:{predictor_node}": 0.01}
-            
-            # 创建 Predictor
-            if predictor_options:
-                self.components["predictor"] = predictor_cls.options(**predictor_options).remote(self.models)
-            else:
-                self.components["predictor"] = predictor_cls.remote(self.models)
-            
-            print(f"Controller: Predictor 初始化成功（节点: {predictor_node}）")
-        
         print(f"Controller: 所有组件初始化完成！")
     
     def start(self):
@@ -289,6 +300,12 @@ class DefaultController(BaseController):
                     actor.update_all_model_parameters.remote(model_params)
                     print(f"Controller: 已发送参数更新请求给 Actor {i+1}")
                 print(f"Controller: 模型参数已同步，更新了 {len(self.components['actors'])} 个 Actors")
+
+                # 更新所有 Predictors 的模型参数
+                for predictor_name, predictor_actor in self.components.get("predictors", {}).items():
+                    if predictor_name in model_params:
+                        predictor_actor.update_parameters.remote(predictor_name, model_params[predictor_name])
+                        print(f"Controller: 已发送参数更新请求给 Predictor '{predictor_name}'")
             
             print("=" * 60)
         

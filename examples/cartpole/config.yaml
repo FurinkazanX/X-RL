@@ -63,6 +63,12 @@ agents:
     predictors:  # 智能体使用的 Predictor
       - main
 
+# Predictor 配置
+predictor:
+  type: LocalPredictor  # Predictor 类型，可选 LocalPredictor 或 DistributedPredictor
+  nodes:  # Predictor 运行节点
+    - localhost
+
 # Controller 配置
 controller:
   type: SyncController  # Controller 类型
