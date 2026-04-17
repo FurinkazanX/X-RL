@@ -167,40 +167,46 @@ class SyncController(BaseController):
             importlib.import_module("xrl.core.actor"),
             actor_config.get("type", "Actor")
         )
-        
+        actor_gamma = actor_config.get("gamma", 0.99)
+        actor_lam = actor_config.get("lam", 0.95)
+
         # 获取 Actor 节点列表
         actor_nodes = actor_config.get("nodes", ["localhost"])
-        
+
         self.components["actors"] = []
         for i in range(actor_count):
             # 每个 Actor 创建独立的环境实例
             env = env_cls(**env_config.get("params", {}))
-            
+
             # 选择节点（轮询分配）
             node = actor_nodes[i % len(actor_nodes)]
-            
+
             # 准备 Actor options
             actor_options = {}
             if node != "localhost":
                 # 指定节点资源
                 actor_options["resources"] = {f"node:{node}": 0.01}
-            
+
             # 创建 Actor
             if actor_options:
                 actor = actor_cls.options(**actor_options).remote(
                     env,
                     self.agents,
                     self.components["replay_buffer"],
-                    self.models
+                    self.models,
+                    actor_gamma,
+                    actor_lam
                 )
             else:
                 actor = actor_cls.remote(
                     env,
                     self.agents,
                     self.components["replay_buffer"],
-                    self.models
+                    self.models,
+                    actor_gamma,
+                    actor_lam
                 )
-            
+
             self.components["actors"].append(actor)
             print(f"SyncController: Actor {i+1} 初始化成功（节点: {node}）")
         

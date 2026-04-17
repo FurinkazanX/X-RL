@@ -154,10 +154,12 @@ class DefaultController(BaseController):
             importlib.import_module("xrl.core.actor"),
             actor_config.get("type", "Actor")
         )
-        
+        actor_gamma = actor_config.get("gamma", 0.99)
+        actor_lam = actor_config.get("lam", 0.95)
+
         # 获取 Actor 节点列表
         actor_nodes = actor_config.get("nodes", ["localhost"])
-        
+
         self.components["actors"] = []
         for i in range(actor_count):
             # 每个 Actor 创建独立的环境实例
@@ -177,14 +179,18 @@ class DefaultController(BaseController):
                     env,
                     self.agents,
                     self.components["replay_buffer"],
-                    self.models
+                    self.models,
+                    actor_gamma,
+                    actor_lam
                 )
             else:
                 actor = actor_cls.remote(
                     env,
                     self.agents,
                     self.components["replay_buffer"],
-                    self.models
+                    self.models,
+                    actor_gamma,
+                    actor_lam
                 )
             
             self.components["actors"].append(actor)

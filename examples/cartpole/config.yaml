@@ -17,6 +17,8 @@ ray:
 # Actor 配置
 actor:
   count: 10 # Actor 数量
+  gamma: 0.99  # 折扣因子
+  lam: 0.95    # GAE lambda 参数
   nodes:  # Actor 运行节点
     - localhost
 

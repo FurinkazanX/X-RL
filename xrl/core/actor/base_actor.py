@@ -9,19 +9,23 @@ from xrl.core.replay_buffer.base_replay_buffer import BaseReplayBuffer
 class BaseActor:
     """Actor 基类"""
     
-    def __init__(self, env: Env, agents: Dict[str, Agent], replay_buffer: BaseReplayBuffer, models: Optional[Dict[str, Any]] = None):
+    def __init__(self, env: Env, agents: Dict[str, Agent], replay_buffer: BaseReplayBuffer, models: Optional[Dict[str, Any]] = None, gamma: float = 0.99, lam: float = 0.95):
         """初始化 Actor
-        
+
         Args:
             env: 环境实例
             agents: Agent 实例字典
             replay_buffer: Replay Buffer 实例（Ray Actor 句柄）
             models: 模型实例字典
+            gamma: 折扣因子
+            lam: GAE lambda 参数
         """
         self.env = env
         self.agents = agents
         self.replay_buffer = replay_buffer
         self.models = models or {}
+        self.gamma = gamma
+        self.lam = lam
     
     def run(self) -> None:
         """运行 Actor，与环境交互并收集经验"""

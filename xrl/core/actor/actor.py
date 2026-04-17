@@ -72,7 +72,7 @@ class Actor(BaseActor):
                     
                     trajectory = Trajectory(step_infos)
                     model = self.models[model_name]
-                    processed_experiences = model.process_trajectory(trajectory, gamma=0.99, lam=0.95)
+                    processed_experiences = model.process_trajectory(trajectory, gamma=self.gamma, lam=self.lam)
                     
                     all_processed_experiences.extend(processed_experiences)
                 
