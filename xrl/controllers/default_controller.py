@@ -112,14 +112,13 @@ class DefaultController(BaseController):
                                 if name in self.components["predictors"]}
             self.agents[agent_name] = agent_cls(agent_models, agent_predictors)
         
-        # 初始化环境
+        # 初始化环境（保存配置供每个 Actor 独立创建实例）
         env_config = self.config.get("env", {})
         env_cls = getattr(
             importlib.import_module(env_config["module"]),
             env_config["class"]
         )
-        self.env = env_cls(**env_config.get("params", {}))
-        
+
         # 初始化 Replay Buffer（支持节点分配）
         replay_buffer_config = self.config.get("replay_buffer", {})
         replay_buffer_cls = getattr(
@@ -161,25 +160,28 @@ class DefaultController(BaseController):
         
         self.components["actors"] = []
         for i in range(actor_count):
+            # 每个 Actor 创建独立的环境实例
+            env = env_cls(**env_config.get("params", {}))
+
             # 选择节点（轮询分配）
             node = actor_nodes[i % len(actor_nodes)]
-            
+
             # 准备 Actor options
             actor_options = {}
             if node != "localhost":
                 actor_options["resources"] = {f"node:{node}": 0.01}
-            
+
             # 创建 Actor
             if actor_options:
                 actor = actor_cls.options(**actor_options).remote(
-                    self.env,
+                    env,
                     self.agents,
                     self.components["replay_buffer"],
                     self.models
                 )
             else:
                 actor = actor_cls.remote(
-                    self.env,
+                    env,
                     self.agents,
                     self.components["replay_buffer"],
                     self.models
