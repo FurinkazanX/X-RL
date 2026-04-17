@@ -1,7 +1,6 @@
 """Model 接口定义"""
 
-from typing import Dict, Any, Optional
-from typing import Dict, Any, List
+from typing import Dict, Any, Optional, List
 from xrl.core.types import Trajectory, Experience
 
 
