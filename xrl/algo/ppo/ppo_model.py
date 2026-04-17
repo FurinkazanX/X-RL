@@ -321,13 +321,14 @@ class PPOModel(Model):
     @staticmethod
     def _compute_gae(rewards: List[float], values: List[float], dones: List[bool], gamma: float, lam: float) -> List[float]:
         """计算 GAE 优势"""
-        advantages = []
-        gae = 0
-        
-        for t in reversed(range(len(rewards))):
-            next_value = 0 if t == len(rewards) - 1 else values[t + 1]
+        n = len(rewards)
+        advantages = np.zeros(n, dtype=np.float32)
+        gae = 0.0
+
+        for t in reversed(range(n)):
+            next_value = 0.0 if t == n - 1 else values[t + 1]
             delta = rewards[t] + gamma * next_value * (1 - dones[t]) - values[t]
             gae = delta + gamma * lam * (1 - dones[t]) * gae
-            advantages.insert(0, gae)
-        
-        return advantages
+            advantages[t] = gae
+
+        return advantages.tolist()
